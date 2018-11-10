@@ -1,0 +1,55 @@
+---
+- hosts: wordpress_nodes
+  become: yes
+  vars:
+    blog_path: /var/www/wordpress
+    database_name: adsk_wordpress
+    database_user: root
+    database_password: ''
+    database_host: localhost
+    wordpress_archive_url: https://pl.wordpress.org/wordpress-4.9.8-pl_PL.tar.gz
+  tasks:
+    - name: "Install http server"
+      yum:
+        name: httpd
+        state: latest
+    - name: "instal php module"
+      yum:
+        name: "{{item}}"
+        state: latest
+      with_items:
+        - php
+        - php-mysql
+    - name: "Install mariadb dependencies"
+      yum:
+        name: ["mariadb", "mariadb-server", "MySQL-python"]
+        state: latest
+    - name: "Restart mariadb"  
+      service:
+        name: mariadb
+        state: restarted
+    - name: "download wordpress"
+      get_url:
+        url: "{{wordpress_archive_url}}"
+        dest: ~/wordpress.tar.gz
+    - name: "Unpack WordPress archive"
+      unarchive:
+        src: ~/wordpress.tar.gz
+        dest: /var/www/
+        remote_src: yes
+    - name: "set up wordpress database"
+      mysql_db:
+        name: "{{database_name}}"
+        state: present
+    - name: "configure apache vhost"
+      template:
+        src: templates/vhosts.conf
+        dest: /etc/httpd/conf.d/blog.conf
+    - name: "start httpd server"
+      service:
+        name: httpd
+        state: restarted
+    - name: "copy wordpress"
+      template:
+        src: templates/wp-config.php
+        dest: "{{blog_path}}/wp-config.php"
